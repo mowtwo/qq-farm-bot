@@ -22,6 +22,7 @@ const { startSellLoop, stopSellLoop, debugSellFruits } = require('./src/warehous
 const { processInviteCodes } = require('./src/invite');
 const { verifyMode, decodeMode } = require('./src/decode');
 const { emitRuntimeHint, sleep } = require('./src/utils');
+const { getQQFarmCodeByScan } = require('./src/qqQrLogin');
 
 // ============ 帮助信息 ============
 function showHelp() {
@@ -31,18 +32,22 @@ QQ经典农场 挂机脚本
 
 用法:
   FARM_CODE=<登录code> node client.js
+  FARM_QR_LOGIN=true node client.js
+  node client.js --qr
   node client.js --verify
   node client.js --decode <数据> [--hex] [--gate] [--type <消息类型>]
 
 环境变量:
-  FARM_CODE                    小程序 login() 返回的临时凭证 (必需)
+  FARM_CODE                    小程序 login() 返回的临时凭证 (QQ平台未设置时自动扫码)
+  FARM_QR_LOGIN                启用QQ扫码登录 (true/false, 默认false)
   FARM_PLATFORM                平台: qq (默认) 或 wx (微信)
   FARM_CHECK_INTERVAL          自己农场巡查完成后等待秒数, 默认1, 最低1
   FARM_FRIEND_CHECK_INTERVAL   好友巡查完成后等待秒数, 默认10, 最低1
   FARM_FORCE_LOWEST_CROP       固定种最低等级作物 (true/false, 默认false)
   FARM_TOP_CANDIDATES          从前N个最优种子中随机选择 (默认5)
 
-开发工具:
+参数:
+  --qr                启动后使用QQ扫码获取登录code (仅QQ平台)
   --verify            验证proto定义
   --decode            解码PB数据 (运行 --decode 无参数查看详细帮助)
 
@@ -97,10 +102,36 @@ async function main() {
     }
 
     // 正常挂机模式 - 从环境变量读取配置
-    if (!CONFIG.code) {
+    let loginCode = CONFIG.code;
+    let usedQrLogin = false;
+
+    // QQ 平台支持扫码登录:
+    // 1. 显式 --qr 参数或 FARM_QR_LOGIN=true 时强制使用扫码
+    // 2. 未设置 FARM_CODE 时自动触发扫码
+    const wantQrLogin = CONFIG.qrLogin || args.includes('--qr');
+    if (CONFIG.platform === 'qq' && (wantQrLogin || !loginCode)) {
+        if (wantQrLogin) {
+            console.log('[扫码登录] 正在获取二维码...');
+        } else {
+            console.log('[扫码登录] 未设置 FARM_CODE，自动启动扫码登录...');
+        }
+        loginCode = await getQQFarmCodeByScan();
+        usedQrLogin = true;
+        console.log(`[扫码登录] 获取成功，code=${loginCode.substring(0, 8)}...`);
+    }
+
+    if (!loginCode) {
+        if (CONFIG.platform === 'wx') {
+            console.log('[参数] 微信模式需要设置 FARM_CODE 环境变量');
+        }
         console.error('[错误] 未设置 FARM_CODE 环境变量');
         showHelp();
         process.exit(1);
+    }
+
+    // 扫码阶段结束后清屏，避免状态栏覆盖二维码区域导致界面混乱
+    if (usedQrLogin && process.stdout.isTTY) {
+        process.stdout.write('\x1b[2J\x1b[H');
     }
 
     // 初始化状态栏
@@ -109,10 +140,10 @@ async function main() {
     emitRuntimeHint(true);
 
     const platformName = CONFIG.platform === 'wx' ? '微信' : 'QQ';
-    console.log(`[启动] ${platformName} code=${CONFIG.code.substring(0, 8)}... 农场${CONFIG.farmCheckInterval / 1000}s 好友${CONFIG.friendCheckInterval / 1000}s`);
+    console.log(`[启动] ${platformName} code=${loginCode.substring(0, 8)}... 农场${CONFIG.farmCheckInterval / 1000}s 好友${CONFIG.friendCheckInterval / 1000}s`);
 
     // 连接并登录，登录成功后启动各功能模块
-    connect(async () => {
+    connect(loginCode, async () => {
         // 处理邀请码 (仅微信环境)
         await processInviteCodes();
 

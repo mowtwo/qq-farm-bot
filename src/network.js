@@ -313,13 +313,7 @@ function sendLogin(onLoginSuccess) {
     const body = types.LoginRequest.encode(types.LoginRequest.create({
         sharer_id: toLong(0),
         sharer_open_id: '',
-        device_info: {
-            client_version: CONFIG.clientVersion,
-            sys_software: 'iOS 26.2.1',
-            network: 'wifi',
-            memory: '7672',
-            device_id: 'iPhone X<iPhone18,3>',
-        },
+        device_info: CONFIG.device_info,
         share_cfg_id: toLong(0),
         scene_id: '1256',
         report_data: {
@@ -416,8 +410,8 @@ function startHeartbeat() {
 }
 
 // ============ WebSocket 连接 ============
-function connect(onLoginSuccess) {
-    const url = `${CONFIG.serverUrl}?platform=${CONFIG.platform}&os=${CONFIG.os}&ver=${CONFIG.clientVersion}&code=${CONFIG.code}&openID=`;
+function connect(code, onLoginSuccess) {
+    const url = `${CONFIG.serverUrl}?platform=${CONFIG.platform}&os=${CONFIG.os}&ver=${CONFIG.clientVersion}&code=${code}&openID=`;
 
     ws = new WebSocket(url, {
         headers: {

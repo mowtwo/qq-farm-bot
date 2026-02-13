@@ -6,6 +6,9 @@ const CONFIG = {
     // 登录凭证 (环境变量 FARM_CODE)
     code: process.env.FARM_CODE || '',
 
+    // QQ扫码登录 (环境变量 FARM_QR_LOGIN, 或 --qr 参数)
+    qrLogin: process.env.FARM_QR_LOGIN === 'true',
+
     serverUrl: 'wss://gate-obt.nqf.qq.com/prod/ws',
     clientVersion: '1.6.0.14_20251224',
     platform: process.env.FARM_PLATFORM === 'wx' ? 'wx' : 'qq',  // 环境变量 FARM_PLATFORM: qq(默认) 或 wx
@@ -19,6 +22,15 @@ const CONFIG = {
     excludedSeeds: [20002, 20003],
     // 从前N个最优种子中随机选择 (环境变量 FARM_TOP_CANDIDATES, 默认5)
     topCandidateCount: parseInt(process.env.FARM_TOP_CANDIDATES) || 5,
+
+    // 设备信息 (用于登录时模拟客户端)
+    device_info: {
+        client_version: '1.6.0.14_20251224',
+        sys_software: 'iOS 26.2.1',
+        network: 'wifi',
+        memory: '7672',
+        device_id: 'iPhone X<iPhone18,3>',
+    },
 };
 
 // 运行期提示文案（做了简单编码，避免明文散落）
