@@ -23,6 +23,26 @@ const CONFIG = {
     // 从前N个最优种子中随机选择 (环境变量 FARM_TOP_CANDIDATES, 默认5)
     topCandidateCount: parseInt(process.env.FARM_TOP_CANDIDATES) || 5,
 
+    // 偷菜白名单: 白名单中的好友不偷菜，但仍然帮忙浇水/除草/除虫
+    // 支持 gid (纯数字) 和 name (非数字字符串) 混合，逗号分隔
+    // 环境变量 FARM_STEAL_WHITELIST, 例: "小明,123456,小红"
+    stealWhitelist: (() => {
+        const raw = process.env.FARM_STEAL_WHITELIST || '';
+        if (!raw.trim()) return { gids: new Set(), names: new Set() };
+        const gids = new Set();
+        const names = new Set();
+        for (const item of raw.split(',')) {
+            const trimmed = item.trim();
+            if (!trimmed) continue;
+            if (/^\d+$/.test(trimmed)) {
+                gids.add(parseInt(trimmed, 10));
+            } else {
+                names.add(trimmed);
+            }
+        }
+        return { gids, names };
+    })(),
+
     // 设备信息 (用于登录时模拟客户端)
     device_info: {
         client_version: '1.6.0.14_20251224',

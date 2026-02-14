@@ -44,6 +44,14 @@ const HELP_ONLY_WITH_EXP = true; // 已更新可用
 // 配置: 是否启用放虫放草功能
 const ENABLE_PUT_BAD_THINGS = false;  // 无效！！！开启后会多次访问朋友导致被拉黑 请勿更改暂时关闭放虫放草功能
 
+/**
+ * 检查好友是否在偷菜白名单中 (白名单中的好友不偷菜)
+ */
+function isStealWhitelisted(gid, name) {
+    const { gids, names } = CONFIG.stealWhitelist;
+    return gids.has(gid) || names.has(name);
+}
+
 // ============ 好友 API ============
 
 async function getAllFriends() {
@@ -434,17 +442,33 @@ async function visitFriend(friend, totalActions, myGid) {
         }
     }
 
-    // 偷菜: 始终执行
-    if (status.stealable.length > 0) {
+    // 偷菜: 白名单好友不偷
+    if (status.stealable.length > 0 && !isStealWhitelisted(gid, name)) {
+        // 检测到可偷时延迟1秒
+        await sleep(1000);
+
+        // 可偷数量超过100时，只偷80%
+        let stealTargets = status.stealable;
+        let stealInfos = status.stealableInfo;
+        if (stealTargets.length > 100) {
+            const maxSteal = Math.floor(stealTargets.length * 0.8);
+            log('好友', `${name}: 可偷${stealTargets.length}块，限制偷${maxSteal}块(80%)`);
+            const indices = [...Array(stealTargets.length).keys()];
+            shuffleArray(indices);
+            const selected = indices.slice(0, maxSteal).sort((a, b) => a - b);
+            stealTargets = selected.map(i => stealTargets[i]);
+            stealInfos = selected.map(i => stealInfos[i]);
+        }
+
         let ok = 0;
         const stolenPlants = [];
-        for (let i = 0; i < status.stealable.length; i++) {
-            const landId = status.stealable[i];
+        for (let i = 0; i < stealTargets.length; i++) {
+            const landId = stealTargets[i];
             try {
                 await stealHarvest(gid, [landId]);
                 ok++;
-                if (status.stealableInfo[i]) {
-                    stolenPlants.push(status.stealableInfo[i].name);
+                if (stealInfos[i]) {
+                    stolenPlants.push(stealInfos[i].name);
                 }
             } catch (e) { /* ignore */ }
             await randomDelay(100);
@@ -454,6 +478,8 @@ async function visitFriend(friend, totalActions, myGid) {
             actions.push(`偷${ok}${plantNames ? '(' + plantNames + ')' : ''}`);
             totalActions.steal += ok;
         }
+    } else if (status.stealable.length > 0) {
+        log('好友', `${name}: 白名单跳过偷菜(可偷${status.stealable.length})`);
     }
 
     // 捣乱操作: 放虫(10004)/放草(10003)
